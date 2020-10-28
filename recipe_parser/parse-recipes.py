@@ -5,6 +5,7 @@ import re
 from bs4 import BeautifulSoup
 from nltk.tokenize import sent_tokenize
 from socket import error as SocketError
+from recipe_scrapers import scrape_me
 
 #
 # checks whether the first argument is the same word as a plural string, checking plurals
@@ -465,37 +466,65 @@ while "" in allIngredients:
 unlabeledIngredients = set()
 unlabeledRecipes = set()
 
-# recipes start at id~6660 and end at id=~27000
-for recipeId in range(6665, 6670):
-	soup = None
-	try:
-		url = "http://allrecipes.com/recipe/{}".format(recipeId)
+# fopen = open("../input_files/indianhealthyrecipes_urls.txt", "r")
+input_urls = ["https://www.gimmesomeoven.com/homemade-tortilla-chips/", "https://www.gimmesomeoven.com/green-goddess-feta-dip/", "https://www.gimmesomeoven.com/muhamarra/", "https://www.gimmesomeoven.com/greek-fava/", "https://www.gimmesomeoven.com/baba-ganoush/"]
+# for line in fopen:
+# 	input_urls.append(line)
 
-		with urllib.request.urlopen(url) as response:
-			soup = BeautifulSoup(response.read(), "html.parser")
-	
-	except urllib.error.HTTPError as e:
-		outputFile.write("{0}: No recipe".format(recipeId))
-		outputFile.write(e.reason)
-	except urllib.error.URLError as e:
-		outputFile.write("{0}: URL ERROR".format(recipeId))
-		outputFile.write(e.reason)
-	except SocketError as e:
-		outputFile.write("{0}: SOCKET ERROR".format(recipeId))
+# recipes start at id~6660 and end at id=~27000
+for recipeId in range(len(input_urls)):
+	recipe_url = input_urls[recipeId]
+	soup = True
+	# try:
+	# 	url = "http://allrecipes.com/recipe/{}".format(recipeId)
+	#
+	# 	with urllib.request.urlopen(url) as response:
+	# 		soup = BeautifulSoup(response.read(), "html.parser")
+	#
+	# except urllib.error.HTTPError as e:
+	# 	outputFile.write("{0}: No recipe".format(recipeId))
+	# 	outputFile.write(e.reason)
+	# except urllib.error.URLError as e:
+	# 	outputFile.write("{0}: URL ERROR".format(recipeId))
+	# 	outputFile.write(e.reason)
+	# except SocketError as e:
+	# 	outputFile.write("{0}: SOCKET ERROR".format(recipeId))
 
 	if soup:
-		titleSpan = soup.find("h1", class_="recipe-summary__h1")
-		servingSpan = soup.find("span", class_="servings-count")
-		calorieSpan = soup.find("span", class_="calorie-count")
-		directionObjects = soup.find_all("span", class_="recipe-directions__list--item")
-		ingredientObjects = soup.find_all("span", class_="recipe-ingred_txt")
-		footnotesSection = soup.find("section", class_="recipe-footnotes")
+
+		try:
+			scraper = scrape_me(recipe_url)
+		except:
+			try:
+				scraper = scrape_me(recipe_url, wild_mode = True)
+			except:
+				continue
+
+		titleSpan = scraper.title()
+		servingSpan = scraper.yields()
+		directionObjects = scraper.instructions()
+		ingredientObjects = scraper.ingredients()
+		host_url = scraper.host()
+		recipe_image = scraper.image()
+		total_time = scraper.title()
+
+
+
+
+
+		# titleSpan = soup.find("h1", class_="recipe-summary__h1")
+		# servingSpan = soup.find("span", class_="servings-count")
+		# calorieSpan = soup.find("span", class_="calorie-count")
+		# directionObjects = soup.find_all("span", class_="recipe-directions__list--item")
+		# ingredientObjects = soup.find_all("span", class_="recipe-ingred_txt")
+		# footnotesSection = soup.find("section", class_="recipe-footnotes")
 
 		#
 		# get title
 		# try except block to handle empty match
 		try:
-			title = titleSpan.text
+			#title = titleSpan.text
+			title = titleSpan
 		except:
 			title = ""
 		title = title.replace("Linguini", "Linguine")
@@ -517,12 +546,13 @@ for recipeId in range(6665, 6670):
 		# get ingredients
 		#
 
-		count = len(ingredientObjects) - 3 # 2 spans with "Add all" and 1 empty
+		count = len(ingredientObjects) # 2 spans with "Add all" and 1 empty
 		ingredients = []
 		for i in range(0, count):
 			# try except block to handle empty match
 			try:
-				ingredientString = ingredientObjects[i].text
+				ingredientString = ingredientObjects[i]
+				#ingredientString = ingredientObjects[i].text
 			except:
 				ingredientString = ""
 			
@@ -774,63 +804,85 @@ for recipeId in range(6665, 6670):
 		#
 
 		# get number of spans and concatenate all contents to string
-		count = len(directionObjects) - 1 # 1 empty span at end
+		count = len(directionObjects) # 1 empty span at end
 		try:
-			directionsString = directionObjects[0].text
+			directionsString = directionObjects
+			#directionsString = directionObjects[0].text
 		except:
 			directionsString = ""
-		for i in range(1, count):
-			directionsString += " " + directionObjects[i].text
 
-		# use nltk to split direction string into sentences
-		# try except block to handle empty matches
-		try:
-			directionsArray = sent_tokenize(directionsString)
-		except:
-			directionsArray = []
-		directions = []
-		for i in range(0, len(directionsArray)):
-			direction = {}
-			direction["step"] = i
-			direction["direction"] = directionsArray[i]
-			directions.append(direction)
+		directions = directionsString
+		# for i in range(0, count):
+		# 	directionsString += " " + directionObjects[i]
+		# 	#directionsString += " " + directionObjects[i].text
+		#
+		# # use nltk to split direction string into sentences
+		# # try except block to handle empty matches
+		# try:
+		# 	directionsArray = sent_tokenize(directionsString)
+		# except:
+		# 	directionsArray = []
+		# directions = []
+		# for i in range(0, len(directionsArray)):
+		# 	direction = {}
+		# 	direction["step"] = i
+		# 	direction["direction"] = directionsArray[i]
+		# 	directions.append(direction)
 
 		#
 		# get footnotes
 		#
-		footnotes = []
-		if footnotesSection:
-			for footnote in footnotesSection.find_all("li"):
-				footnotes.append(footnote.text)
+		# footnotes = []
+		# if footnotesSection:
+		# 	for footnote in footnotesSection.find_all("li"):
+		# 		footnotes.append(footnote.text)
 
 		#
 		# get servings
 		#
-		servings = servingSpan.contents[0].text if servingSpan is not None else None
-		if servings and servings.isdigit():
-			servings = eval(servings)
-		else:
-			servings = 0
+		# servings = servingSpan.contents[0].text if servingSpan is not None else None
+		# if servings and servings.isdigit():
+		# 	servings = eval(servings)
+		# else:
+		# 	servings = 0
+
+		servings = servingSpan
 
 		#
 		# get calories
 		#
-		calories = calorieSpan.contents[0].text if calorieSpan is not None else None
-		if calories and calories.isdigit():
-			calories = eval(calories)
-		else:
-			calories = 0
+		# calories = calorieSpan.contents[0].text if calorieSpan is not None else None
+		# if calories and calories.isdigit():
+		# 	calories = eval(calories)
+		# else:
+		# 	calories = 0
 
 		# write ingredient to JSON file
+		# jsonFile.write(json.dumps({"id": recipeId,
+		# 		"name": title,
+		# 		"ingredients": ingredients,
+		# 		"directions": directions,
+		# 		"footnotes": footnotes,
+		# 		"labels": allLabels,
+		# 		"servings": servings,
+		# 		"calories": calories}))
+		# jsonFile.write("\n")
+
 		jsonFile.write(json.dumps({"id": recipeId,
-				"name": title,
-				"ingredients": ingredients, 
-				"directions": directions,
-				"footnotes": footnotes,
-				"labels": allLabels,
-				"servings": servings,
-				"calories": calories}))
+								   "name": title,
+								   "ingredients": ingredients,
+								   "raw_ingredients": ingredientObjects,
+								   "directions": directions,
+								   "labels": allLabels,
+								   "servings": servings,
+								   "host_url": host_url,
+								   "recipe_image": recipe_image,
+								   "total_time": total_time}))
 		jsonFile.write("\n")
+
+		host_url = scraper.host()
+		recipe_image = scraper.image()
+		total_time = scraper.title()
 
 		# write data to files every 10 recipes
 		if recipeId % 10 == 0:
