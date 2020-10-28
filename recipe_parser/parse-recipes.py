@@ -466,7 +466,7 @@ unlabeledIngredients = set()
 unlabeledRecipes = set()
 
 # recipes start at id~6660 and end at id=~27000
-for recipeId in range(6660, 27000):
+for recipeId in range(6665, 6670):
 	soup = None
 	try:
 		url = "http://allrecipes.com/recipe/{}".format(recipeId)
@@ -493,8 +493,11 @@ for recipeId in range(6660, 27000):
 
 		#
 		# get title
-		#
-		title = titleSpan.text
+		# try except block to handle empty match
+		try:
+			title = titleSpan.text
+		except:
+			title = ""
 		title = title.replace("Linguini", "Linguine")
 		title = title.replace("Genoese", "Genoise")
 
@@ -517,7 +520,11 @@ for recipeId in range(6660, 27000):
 		count = len(ingredientObjects) - 3 # 2 spans with "Add all" and 1 empty
 		ingredients = []
 		for i in range(0, count):
-			ingredientString = ingredientObjects[i].text
+			# try except block to handle empty match
+			try:
+				ingredientString = ingredientObjects[i].text
+			except:
+				ingredientString = ""
 			
 			# check if not ingredient, but separator
 			# ie "For Bread:"
@@ -768,12 +775,19 @@ for recipeId in range(6660, 27000):
 
 		# get number of spans and concatenate all contents to string
 		count = len(directionObjects) - 1 # 1 empty span at end
-		directionsString = directionObjects[0].text
+		try:
+			directionsString = directionObjects[0].text
+		except:
+			directionsString = ""
 		for i in range(1, count):
 			directionsString += " " + directionObjects[i].text
 
 		# use nltk to split direction string into sentences
-		directionsArray = sent_tokenize(directionsString)
+		# try except block to handle empty matches
+		try:
+			directionsArray = sent_tokenize(directionsString)
+		except:
+			directionsArray = []
 		directions = []
 		for i in range(0, len(directionsArray)):
 			direction = {}
