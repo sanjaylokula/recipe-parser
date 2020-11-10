@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import urllib.request
 import json
 import re
@@ -6,6 +6,9 @@ from bs4 import BeautifulSoup
 from nltk.tokenize import sent_tokenize
 from socket import error as SocketError
 from recipe_scrapers import scrape_me
+from recipe_parser.vulgar_fractions import vulgar_fraction
+from recipe_parser.json_tocsv import json_csv
+import ntpath
 
 #
 # checks whether the first argument is the same word as a plural string, checking plurals
@@ -379,9 +382,9 @@ def getRecipeLabels(parsedRecipe):
 
 
 # list of measurement units for parsing ingredient
-measurementUnits = ['teaspoons','tablespoons','cups','containers','packets','bags','quarts','pounds','cans','bottles',
+measurementUnits = ['teaspoons','tablespoons', 'tbsps','tsps','cups','containers','packets','bags','quarts','pounds','cans','bottles',
 		'pints','packages','ounces','jars','heads','gallons','drops','envelopes','bars','boxes','pinches',
-		'dashes','bunches','recipes','layers','slices','links','bulbs','stalks','squares','sprigs',
+		'dashes','bunches','recipes','layers','slices','links','bulbs','stalks','squares','sprigs','grams',
 		'fillets','pieces','legs','thighs','cubes','granules','strips','trays','leaves','loaves','halves']
 
 #
@@ -446,17 +449,28 @@ hypenatedSuffixes = ['coated', 'free', 'flavored']
 
 #
 # main function
-#
-jsonFile = open("../output_files/recipes.json", "w")
-jsonFile.truncate()
 
-outputFile = open("../output_files/output.txt", "w")
+
+outputFile = open("D:/PyCharm_Projects/recipe-parser/output_files/output.txt", "w")
 outputFile.truncate()
 
 parenthesesRegex = re.compile(r"\([^()]*\)")
 
+# declaring and loading input file
+
+input_urls = []
+input_file = "D:/PyCharm_Projects/recipe-parser/input_files/all_recipies_batch_4.txt"
+fopen = open(input_file, "r")
+
+# custom filename
+json_FileName = str("../output_files/") + str(ntpath.basename(input_file).split(".")[0]) + str("_raw_recipies.json")
+
+#
+jsonFile = open(json_FileName, "w")
+jsonFile.truncate()
+
 # load list of all ingredients
-allIngredientsFile = open("../output_files/allIngredients.txt", "r")
+allIngredientsFile = open("D:/PyCharm_Projects/recipe-parser/output_files/allIngredients.txt", "r")
 allIngredients = allIngredientsFile.read().split("\n")
 allIngredientsFile.close()
 
@@ -465,16 +479,21 @@ while "" in allIngredients:
 
 unlabeledIngredients = set()
 unlabeledRecipes = set()
+# input_urls = ["https://allrecipes.com/recipe/6666/",
+# "https://allrecipes.com/recipe/6662/"]
 
-# fopen = open("../input_files/indianhealthyrecipes_urls.txt", "r")
-input_urls = ["https://www.gimmesomeoven.com/homemade-tortilla-chips/", "https://www.gimmesomeoven.com/green-goddess-feta-dip/", "https://www.gimmesomeoven.com/muhamarra/", "https://www.gimmesomeoven.com/greek-fava/", "https://www.gimmesomeoven.com/baba-ganoush/"]
-# for line in fopen:
-# 	input_urls.append(line)
 
+#input_urls = ["https://www.gimmesomeoven.com/homemade-tortilla-chips/", "https://www.gimmesomeoven.com/green-goddess-feta-dip/", "https://www.gimmesomeoven.com/muhamarra/", "https://www.gimmesomeoven.com/greek-fava/", "https://www.gimmesomeoven.com/baba-ganoush/"]
+for line in fopen:
+	input_urls.append(str(line).rstrip())
+fopen.close()
 # recipes start at id~6660 and end at id=~27000
 for recipeId in range(len(input_urls)):
 	recipe_url = input_urls[recipeId]
+	print(recipe_url)
 	soup = True
+
+	customId = recipeId
 	# try:
 	# 	url = "http://allrecipes.com/recipe/{}".format(recipeId)
 	#
@@ -506,7 +525,7 @@ for recipeId in range(len(input_urls)):
 		ingredientObjects = scraper.ingredients()
 		host_url = scraper.host()
 		recipe_image = scraper.image()
-		total_time = scraper.title()
+		total_time = scraper.total_time()
 
 
 
@@ -546,7 +565,10 @@ for recipeId in range(len(input_urls)):
 		# get ingredients
 		#
 
-		count = len(ingredientObjects) # 2 spans with "Add all" and 1 empty
+		count = len(ingredientObjects)# 2 spans with "Add all" and 1 empty
+		for i in range(len(ingredientObjects)):
+			ingredientObjects[i] = vulgar_fraction(ingredientObjects[i])
+
 		ingredients = []
 		for i in range(0, count):
 			# try except block to handle empty match
@@ -555,7 +577,9 @@ for recipeId in range(len(input_urls)):
 				#ingredientString = ingredientObjects[i].text
 			except:
 				ingredientString = ""
-			
+
+			# ingredientString = vulgar_fraction(ingredientString)
+
 			# check if not ingredient, but separator
 			# ie "For Bread:"
 			if ingredientString.find("For ") == 0 or " " not in ingredientString or \
@@ -582,7 +606,10 @@ for recipeId in range(len(input_urls)):
 
 			# remove "", caused by extra spaces
 			while "" in parsedIngredient:
-				parsedIngredient.remove("")		
+				parsedIngredient.remove("")
+
+
+
 
 			# move prepositions to description
 			for index in range(0, len(parsedIngredient)):
@@ -716,6 +743,8 @@ for recipeId in range(len(input_urls)):
 			if parsedIngredient[-1] == "or":
 				del parsedIngredient[-1]
 
+			# for i in range(len(parsedIngredient)):
+			# 	parsedIngredient[i] = vulgar_fraction(parsedIngredient[i])
 			# replace hyphenated prefixes and suffixes
 			for word in parsedIngredient:
 				for hypenatedSuffix in hypenatedSuffixes:
@@ -804,14 +833,14 @@ for recipeId in range(len(input_urls)):
 		#
 
 		# get number of spans and concatenate all contents to string
-		count = len(directionObjects) # 1 empty span at end
+		# count = len(directionObjects) # 1 empty span at end
 		try:
 			directionsString = directionObjects
 			#directionsString = directionObjects[0].text
 		except:
 			directionsString = ""
 
-		directions = directionsString
+		directions = directionsString.split("\n")
 		# for i in range(0, count):
 		# 	directionsString += " " + directionObjects[i]
 		# 	#directionsString += " " + directionObjects[i].text
@@ -868,14 +897,15 @@ for recipeId in range(len(input_urls)):
 		# 		"calories": calories}))
 		# jsonFile.write("\n")
 
-		jsonFile.write(json.dumps({"id": recipeId,
+		jsonFile.write(json.dumps({"id": customId,
 								   "name": title,
 								   "ingredients": ingredients,
 								   "raw_ingredients": ingredientObjects,
 								   "directions": directions,
 								   "labels": allLabels,
 								   "servings": servings,
-								   "host_url": host_url,
+								   "domain": host_url,
+								   "host_url": recipe_url,
 								   "recipe_image": recipe_image,
 								   "total_time": total_time}))
 		jsonFile.write("\n")
@@ -886,19 +916,19 @@ for recipeId in range(len(input_urls)):
 
 		# write data to files every 10 recipes
 		if recipeId % 10 == 0:
-			unlabeledRecipeFile = open("../output_files/unlabeledRecipes.txt", "w")
+			unlabeledRecipeFile = open("D:/PyCharm_Projects/recipe-parser/output_files/unlabeledRecipes.txt", "w")
 			unlabeledRecipeFile.truncate()
 			for string in sorted(unlabeledRecipes):
 				unlabeledRecipeFile.write("{0}\n".format(string))
 			unlabeledRecipeFile.close()
 
-			unlabeledIngredientsFile = open("../output_files/unlabeledIngredients.txt", "w")
+			unlabeledIngredientsFile = open("D:/PyCharm_Projects/recipe-parser/output_files/unlabeledIngredients.txt", "w")
 			unlabeledIngredientsFile.truncate()
 			for string in sorted(unlabeledIngredients):
 				unlabeledIngredientsFile.write("{0}\n".format(string))
 			unlabeledIngredientsFile.close()
 
-			allIngredientsFile = open("../output_files/allIngredients.txt", "w")
+			allIngredientsFile = open("D:/PyCharm_Projects/recipe-parser/output_files/allIngredients.txt", "w")
 			allIngredientsFile.truncate()
 			for string in sorted(allIngredients):
 				allIngredientsFile.write("{0}\n".format(string))
@@ -908,3 +938,7 @@ for recipeId in range(len(input_urls)):
 
 jsonFile.close()
 outputFile.close()
+json_csv(str(ntpath.basename(json_FileName)))
+#print(ntpath.basename(json_FileName))
+# print(ntpath.realpath(json_FileName))
+
